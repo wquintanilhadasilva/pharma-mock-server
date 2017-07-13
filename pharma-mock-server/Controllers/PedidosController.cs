@@ -21,15 +21,20 @@ namespace pharma_mock_server.Controllers
             {
                 for (var i = 1; i <= 30; i++)
                 {
+                    var itensAux = this.GetItens(i);
+
                     var o = new
                     {
                         number = i,
                         date = DateTime.Now,
                         customer = $"Cliente MMMMMM MMMMMMM MMMMMM MMMMM {i}",
                         status = "Pendente",
-                        itens = this.GetItens(i)
+                        itens = itensAux,
+                        margin = this.GetMarginOrder(itensAux),
+                        totalOrder = this.GetTotalOrder(itensAux),
+                        qtdeItens = itensAux.Count
                     };
-
+                    
                     listaDePedidos.Add(o);
 
                 }
@@ -78,23 +83,61 @@ namespace pharma_mock_server.Controllers
         private IList<dynamic> GetItens(int pedido)
         {
             var retorno = new List<dynamic>();
-
             for (var c = 1; c <= 20; c++)
             {
+                double qtde = pedido + c;
+                double sales = 10 * retorno.Count / 0.2;
+                double total = qtde * sales;
+                double unitcost = 5.00 / c;
+                double totalcost = unitcost * qtde;
+                double tx = 1.5 * pedido + retorno.Count;
+                double margin = total == 0 ? 0 : (total - (tx + totalcost)) / total;
+
                 var item = new
                 {
                     id = Convert.ToString(c),
                     productName = $"Produto XPTO {c} - {pedido}",
-                    productUnitCost = 5.00 / c,
-                    quantidade = pedido + c,
-                    salesPrice = 10 * retorno.Count / 0.2,
-                    tax = 1.5 * pedido + retorno.Count,
-                    totalItem = c
+                    quantidade = qtde,
+                    salesPrice = sales,
+                    totalItem = total,
+                    productUnitCost = unitcost,
+                    totalCost = totalcost,
+                    tax = tx,
+                    margin = margin
                 };
                 retorno.Add(item);
             }
 
             return retorno;
         }
+
+        private double GetMarginOrder(dynamic itens) {
+            double marginSum = 0;
+            double totalItems = 0;
+            try {
+
+                foreach(dynamic i in itens)
+                {
+                    marginSum += i.margin;
+                    totalItems += i.quantidade;
+                }
+
+                return totalItems == 0 ? 0 : marginSum / totalItems;
+
+            }catch (Exception e) {
+                Console.WriteLine(e.StackTrace);
+                return 0;
+            }
+        }
+
+        private double GetTotalOrder(dynamic itens) {
+            double total = 0;
+            foreach (dynamic i in itens)
+            {
+                total += i.totalItem;
+            }
+            return total;
+        }
+
     }
 }
