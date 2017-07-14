@@ -50,6 +50,27 @@ namespace pharma_mock_server.Controllers
 
         }
 
+        [HttpPost("calcularValoresPedido")]
+        public dynamic calcularValoresPedido([FromBody] dynamic pedidoJson)
+        {
+            pedidoJson.margin = this.GetMarginOrder(pedidoJson.itens);
+            pedidoJson.totalOrder = this.GetTotalOrder(pedidoJson.itens);
+            pedidoJson.qtdeItens = pedidoJson.itens.Count;
+
+            return pedidoJson;
+        }
+
+        [HttpPost("calcularValoresItem")]
+        public dynamic calcularValoresItem([FromBody] dynamic itemJson)
+        {
+            itemJson.totalItem = itemJson.quantidade * itemJson.salesPrice;
+            itemJson.totalCost = itemJson.productUnitCost * itemJson.quantidade;
+            itemJson.tax = 0.015 * (double) itemJson.totalItem;
+            itemJson.margin = itemJson.totalItem == 0 ? 0 : (itemJson.totalItem - (itemJson.tax + itemJson.totalCost)) / itemJson.totalItem * 100;
+
+            return itemJson;
+        }
+
         // GET api/pedidos/GetQuantidadePedidos
         [HttpGet("GetQuantidadePedidos")]
         public int GetQuantidadePedidos() {
@@ -90,7 +111,7 @@ namespace pharma_mock_server.Controllers
                 double total = qtde * sales;
                 double unitcost = 5.00 / c;
                 double totalcost = unitcost * qtde;
-                double tx = 1.5 * pedido + retorno.Count;
+                double tx = 0.015 * total;
                 double margin = total == 0 ? 0 : (total - (tx + totalcost)) / total;
 
                 var item = new
@@ -118,8 +139,8 @@ namespace pharma_mock_server.Controllers
 
                 foreach(dynamic i in itens)
                 {
-                    marginSum += i.margin;
-                    totalItems += i.quantidade;
+                    marginSum = marginSum + i.margin;
+                    totalItems = totalItems + i.quantidade;
                 }
 
                 return totalItems == 0 ? 0 : marginSum / totalItems;
@@ -134,7 +155,7 @@ namespace pharma_mock_server.Controllers
             double total = 0;
             foreach (dynamic i in itens)
             {
-                total += i.totalItem;
+                total = total + (double) i.totalItem;
             }
             return total;
         }
