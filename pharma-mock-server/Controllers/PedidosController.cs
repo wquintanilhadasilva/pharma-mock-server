@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.CSharp.RuntimeBinder;
+using Newtonsoft.Json;
 
 namespace pharma_mock_server.Controllers
 {
@@ -32,6 +33,8 @@ namespace pharma_mock_server.Controllers
                         itens = itensAux,
                         margin = this.GetMarginOrder(itensAux),
                         totalOrder = this.GetTotalOrder(itensAux),
+                        cost = this.getCostOrder(itensAux),
+                        tax = this.getTaxOrder(itensAux),
                         qtdeItens = itensAux.Count
                     };
                     
@@ -54,6 +57,9 @@ namespace pharma_mock_server.Controllers
         public dynamic calcularValoresPedido([FromBody] dynamic pedidoJson)
         {
             pedidoJson.margin = this.GetMarginOrder(pedidoJson.itens);
+            pedidoJson.cost = this.getCostOrder(pedidoJson.itens);
+            pedidoJson.tax = this.getTaxOrder(pedidoJson.itens);
+
             pedidoJson.totalOrder = this.GetTotalOrder(pedidoJson.itens);
             pedidoJson.qtdeItens = pedidoJson.itens.Count;
 
@@ -101,6 +107,30 @@ namespace pharma_mock_server.Controllers
 
         }
 
+        [HttpPost("getMargemGlobal")]
+        public double getMargemGlobal([FromBody] dynamic pedidoJson)
+        {
+
+            //var editOrder = JsonConvert.DeserializeObject<dynamic>(pedidoJson);
+
+            //exclui o pedido em edição na simulação para adicioná-lo no cálculo depois....
+            var pedidos = this.Get().Where(p => (int) p.number != (int) pedidoJson.number);
+
+            var sumCost = (double) pedidos.Sum(p => (double) p.cost);
+            var sumTax = (double) pedidos.Sum(p => (double) p.tax);
+            var sumTotal = (double)pedidos.Sum(p => (double) p.totalOrder);
+
+            // Adiciona os dados do pedido em edição
+            sumCost += this.getCostOrder(pedidoJson.itens);
+            sumTax += this.getTaxOrder(pedidoJson.itens);
+            sumTotal += this.GetTotalOrder(pedidoJson.itens);
+
+            // Calcula a margem global
+            var margin = 0 + ((sumTotal - (sumCost + sumTax) * 100) / sumTotal);
+            
+            return margin;
+        }
+
         private IList<dynamic> GetItens(int pedido)
         {
             var retorno = new List<dynamic>();
@@ -139,8 +169,8 @@ namespace pharma_mock_server.Controllers
 
                 foreach(dynamic i in itens)
                 {
-                    marginSum = marginSum + i.margin;
-                    totalItems = totalItems + i.quantidade;
+                    marginSum = marginSum + (double) i.margin;
+                    totalItems = totalItems + (double) i.quantidade;
                 }
 
                 return totalItems == 0 ? 0 : marginSum / totalItems;
@@ -156,6 +186,26 @@ namespace pharma_mock_server.Controllers
             foreach (dynamic i in itens)
             {
                 total = total + (double) i.totalItem;
+            }
+            return total;
+        }
+
+        private double getCostOrder(dynamic itens)
+        {
+            double total = 0;
+            foreach (dynamic i in itens)
+            {
+                total = total + (double)i.totalCost;
+            }
+            return total;
+        }
+
+        private double getTaxOrder(dynamic itens)
+        {
+            double total = 0;
+            foreach (dynamic i in itens)
+            {
+                total = total + (double)i.tax;
             }
             return total;
         }
