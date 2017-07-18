@@ -14,32 +14,44 @@ namespace pharma_mock_server.Controllers
     public class PedidosController : Controller
     {
 
-        private static IList<dynamic> listaDePedidos = new List<dynamic>();
+        private IList<dynamic> listaDePedidos = new List<dynamic>();
+
+        private readonly object syncLock = new object();
 
         public PedidosController()
         {
-            if (listaDePedidos == null || listaDePedidos.Count == 0)
+            this.carregarPedidos();
+        }
+
+        private void carregarPedidos()
+        {
+            lock (syncLock)
             {
-                for (var i = 1; i <= 30; i++)
+                listaDePedidos = new List<dynamic>();
+
+                if (listaDePedidos == null || listaDePedidos.Count == 0)
                 {
-                    var itensAux = this.GetItens(i);
-
-                    var o = new
+                    for (var i = 1; i <= 30; i++)
                     {
-                        number = i,
-                        date = DateTime.Now,
-                        customer = $"Cliente MMMMMM MMMMMMM MMMMMM MMMMM {i}",
-                        status = "Pendente",
-                        itens = itensAux,
-                        margin = this.GetMarginOrder(itensAux),
-                        totalOrder = this.GetTotalOrder(itensAux),
-                        cost = this.getCostOrder(itensAux),
-                        tax = this.getTaxOrder(itensAux),
-                        qtdeItens = itensAux.Count
-                    };
-                    
-                    listaDePedidos.Add(o);
+                        var itensAux = this.GetItens(i);
 
+                        var o = new
+                        {
+                            number = i,
+                            date = DateTime.Now,
+                            customer = $"Cliente MMMMMM MMMMMMM MMMMMM MMMMM {i}",
+                            status = "Pendente",
+                            itens = itensAux,
+                            margin = this.GetMarginOrder(itensAux),
+                            totalOrder = this.getTotalOrder(itensAux),
+                            cost = this.getCostOrder(itensAux),
+                            tax = this.getTaxOrder(itensAux),
+                            qtdeItens = itensAux.Count
+                        };
+
+                        listaDePedidos.Add(o);
+
+                    }
                 }
             }
         }
@@ -48,9 +60,7 @@ namespace pharma_mock_server.Controllers
         [HttpGet]
         public IEnumerable<dynamic> Get()
         {
-
-            return listaDePedidos.ToArray();
-
+            return listaDePedidos;
         }
 
         [HttpPost("calcularValoresPedido")]
@@ -60,7 +70,7 @@ namespace pharma_mock_server.Controllers
             pedidoJson.cost = this.getCostOrder(pedidoJson.itens);
             pedidoJson.tax = this.getTaxOrder(pedidoJson.itens);
 
-            pedidoJson.totalOrder = this.GetTotalOrder(pedidoJson.itens);
+            pedidoJson.totalOrder = this.getTotalOrder(pedidoJson.itens);
             pedidoJson.qtdeItens = pedidoJson.itens.Count;
 
             return pedidoJson;
@@ -81,6 +91,50 @@ namespace pharma_mock_server.Controllers
         [HttpGet("GetQuantidadePedidos")]
         public int GetQuantidadePedidos() {
             return listaDePedidos.Count;
+        }
+
+        // GET api/pedidos/getReferenciaAtual
+        [HttpGet("getReferenciaAtual")]
+        public string getReferenciaAtual()
+        {
+            return String.Format("{0:MM/yyyy}", DateTime.Now);
+        }
+
+        // GET api/pedidos/getFaturamentoGlobal
+        [HttpGet("getFaturamentoGlobal")]
+        public double getFaturamentoGlobal()
+        {
+
+            Double valor = 0d;
+            var orders = this.Get();
+            foreach(var o in orders)
+            {
+                valor = valor + (double) o.totalOrder;
+
+            }
+
+            return valor;
+        }
+
+        // GET api/pedidos/getFaturamentoGlobal
+        [HttpGet("getIndicadoresGlobais")]
+        public dynamic getIndicadoresGlobais()
+        {
+
+            string refer = this.getReferenciaAtual();
+            double faturamento = this.getFaturamentoGlobal();
+            int quantPedidos = this.GetQuantidadePedidos();
+            double margem = this.getMargemGlobal();
+
+            dynamic retorno = new
+            {
+                referencia = refer,
+                faturamentoGlobal = faturamento,
+                margemGlobal = margem,
+                qtdePedidosGlobal = quantPedidos
+            };
+
+            return retorno;
         }
 
         // GET api/pedidos/5
@@ -123,7 +177,7 @@ namespace pharma_mock_server.Controllers
             // Adiciona os dados do pedido em edição
             sumCost += this.getCostOrder(pedidoJson.itens);
             sumTax += this.getTaxOrder(pedidoJson.itens);
-            sumTotal += this.GetTotalOrder(pedidoJson.itens);
+            sumTotal += this.getTotalOrder(pedidoJson.itens);
 
             // Calcula a margem global
             var margin = 0 + ((sumTotal - (sumCost + sumTax) * 100) / sumTotal);
@@ -181,7 +235,7 @@ namespace pharma_mock_server.Controllers
             }
         }
 
-        private double GetTotalOrder(dynamic itens) {
+        private double getTotalOrder(dynamic itens) {
             double total = 0;
             foreach (dynamic i in itens)
             {
@@ -208,6 +262,18 @@ namespace pharma_mock_server.Controllers
                 total = total + (double)i.tax;
             }
             return total;
+        }
+
+        private double getMargemGlobal()
+        {
+            var pedidos = this.Get();
+            double retorno = 0d;
+
+            foreach(var o in pedidos)
+            {
+                retorno = retorno + (double) o.margin;
+            }
+            return retorno;
         }
 
     }
