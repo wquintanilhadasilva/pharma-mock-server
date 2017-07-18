@@ -82,7 +82,7 @@ namespace pharma_mock_server.Controllers
             itemJson.totalItem = itemJson.quantidade * itemJson.salesPrice;
             itemJson.totalCost = itemJson.productUnitCost * itemJson.quantidade;
             itemJson.tax = 0.015 * (double) itemJson.totalItem;
-            itemJson.margin = itemJson.totalItem == 0 ? 0 : (itemJson.totalItem - (itemJson.tax + itemJson.totalCost)) / itemJson.totalItem * 100;
+            itemJson.margin = this.getMargin((double) itemJson.totalItem, (double) itemJson.tax, (double) itemJson.totalCost);
 
             return itemJson;
         }
@@ -101,38 +101,30 @@ namespace pharma_mock_server.Controllers
         }
 
         // GET api/pedidos/getFaturamentoGlobal
-        [HttpGet("getFaturamentoGlobal")]
-        public double getFaturamentoGlobal()
-        {
-
-            Double valor = 0d;
-            var orders = this.Get();
-            foreach(var o in orders)
-            {
-                valor = valor + (double) o.totalOrder;
-
-            }
-
-            return valor;
-        }
-
-        // GET api/pedidos/getFaturamentoGlobal
         [HttpGet("getIndicadoresGlobais")]
         public dynamic getIndicadoresGlobais()
         {
 
-            string refer = this.getReferenciaAtual();
-            double faturamento = this.getFaturamentoGlobal();
-            int quantPedidos = this.GetQuantidadePedidos();
-            double margem = this.getMargemGlobal();
+            double totalOrders = 0d;
+            double totalCost = 0d;
+            double totalTax = 0d;
+
+            var orders = this.Get();
+
+            foreach (var o in orders)
+            {
+                totalOrders = totalOrders + this.getTotalOrder(o.itens);
+                totalCost = totalCost + this.getCostOrder(o.itens);
+                totalTax = totalTax + this.getTaxOrder(o.itens);
+            }
 
             dynamic retorno = new
             {
-                referencia = refer,
-                faturamentoGlobal = faturamento,
-                margemGlobal = margem,
-                qtdePedidosGlobal = quantPedidos
-            };
+                referencia = this.getReferenciaAtual(),
+                faturamentoGlobal = totalOrders,
+                margemGlobal = this.getMargin(totalOrders, totalTax, totalCost),
+                qtdePedidosGlobal = this.GetQuantidadePedidos()
+        };
 
             return retorno;
         }
@@ -161,29 +153,29 @@ namespace pharma_mock_server.Controllers
 
         }
 
-        [HttpPost("getMargemGlobal")]
-        public double getMargemGlobal([FromBody] dynamic pedidoJson)
-        {
+        //[HttpPost("getMargemGlobal")]
+        //public double getMargemGlobal([FromBody] dynamic pedidoJson)
+        //{
 
-            //var editOrder = JsonConvert.DeserializeObject<dynamic>(pedidoJson);
+        //    //var editOrder = JsonConvert.DeserializeObject<dynamic>(pedidoJson);
 
-            //exclui o pedido em edição na simulação para adicioná-lo no cálculo depois....
-            var pedidos = this.Get().Where(p => (int) p.number != (int) pedidoJson.number);
+        //    //exclui o pedido em edição na simulação para adicioná-lo no cálculo depois....
+        //    var pedidos = this.Get().Where(p => (int) p.number != (int) pedidoJson.number);
 
-            var sumCost = (double) pedidos.Sum(p => (double) p.cost);
-            var sumTax = (double) pedidos.Sum(p => (double) p.tax);
-            var sumTotal = (double)pedidos.Sum(p => (double) p.totalOrder);
+        //    var sumCost = (double) pedidos.Sum(p => (double) p.cost);
+        //    var sumTax = (double) pedidos.Sum(p => (double) p.tax);
+        //    var sumTotal = (double) pedidos.Sum(p => (double) p.totalOrder);
 
-            // Adiciona os dados do pedido em edição
-            sumCost += this.getCostOrder(pedidoJson.itens);
-            sumTax += this.getTaxOrder(pedidoJson.itens);
-            sumTotal += this.getTotalOrder(pedidoJson.itens);
+        //    // Adiciona os dados do pedido em edição
+        //    sumCost += this.getCostOrder(pedidoJson.itens);
+        //    sumTax += this.getTaxOrder(pedidoJson.itens);
+        //    sumTotal += this.getTotalOrder(pedidoJson.itens);
 
-            // Calcula a margem global
-            var margin = 0 + ((sumTotal - (sumCost + sumTax) * 100) / sumTotal);
+        //    // Calcula a margem global
+        //    var margin = this.getMargin(sumTotal, sumTax, sumCost);
             
-            return margin;
-        }
+        //    return margin;
+        //}
 
         private IList<dynamic> GetItens(int pedido)
         {
@@ -196,7 +188,7 @@ namespace pharma_mock_server.Controllers
                 double unitcost = 5.00 / c;
                 double totalcost = unitcost * qtde;
                 double tx = 0.015 * total;
-                double margin = total == 0 ? 0 : (total - (tx + totalcost)) / total;
+                double margin = this.getMargin(total, tx, totalcost);
 
                 var item = new
                 {
@@ -216,22 +208,28 @@ namespace pharma_mock_server.Controllers
             return retorno;
         }
 
-        private double GetMarginOrder(dynamic itens) {
-            double marginSum = 0;
+        private double GetMarginOrder(dynamic itens)
+        {
             double totalItems = 0;
-            try {
+            double totalCost = 0;
+            double totalTx = 0;
+            try
+            {
 
-                foreach(dynamic i in itens)
+                foreach (dynamic i in itens)
                 {
-                    marginSum = marginSum + (double) i.margin;
-                    totalItems = totalItems + (double) i.quantidade;
+                    totalCost = totalCost + (double)i.totalCost;
+                    totalItems = totalItems + (double)i.totalItem;
+                    totalTx = totalTx + (double)i.tax;
                 }
 
-                return totalItems == 0 ? 0 : marginSum / totalItems;
+                return this.getMargin(totalItems, totalTx, totalCost);
 
-            }catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 Console.WriteLine(e.StackTrace);
-                return 0;
+                return 0d;
             }
         }
 
@@ -263,18 +261,24 @@ namespace pharma_mock_server.Controllers
             }
             return total;
         }
-
-        private double getMargemGlobal()
+               
+        private double getMargin(double totalValue, double taxTotalValue, double costTotalValue)
         {
-            var pedidos = this.Get();
-            double retorno = 0d;
-
-            foreach(var o in pedidos)
-            {
-                retorno = retorno + (double) o.margin;
-            }
-            return retorno;
+            return totalValue == 0 ? 0 : (totalValue - (taxTotalValue + costTotalValue)) / totalValue * 100;
         }
+
+
+        //private double getMargemGlobal()
+        //{
+        //    var pedidos = this.Get();
+        //    double retorno = 0d;
+
+        //    foreach(var o in pedidos)
+        //    {
+        //        retorno = retorno + (double) o.margin;
+        //    }
+        //    return retorno;
+        //}
 
     }
 }
