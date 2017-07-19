@@ -105,24 +105,31 @@ namespace pharma_mock_server.Controllers
         public dynamic getIndicadoresGlobais()
         {
 
-            double totalOrders = 0d;
-            double totalCost = 0d;
-            double totalTax = 0d;
+            //double totalOrders = 0d;
+            //double totalCost = 0d;
+            //double totalTax = 0d;
 
-            var orders = this.Get();
+            //var orders = this.Get();
 
-            foreach (var o in orders)
-            {
-                totalOrders = totalOrders + this.getTotalOrder(o.itens);
-                totalCost = totalCost + this.getCostOrder(o.itens);
-                totalTax = totalTax + this.getTaxOrder(o.itens);
-            }
+            //exclui o pedido em edição na simulação para adicioná-lo no cálculo depois....
+            var pedidos = this.Get();
+
+            var sumCost = (double)pedidos.Sum(p => (double)p.cost);
+            var sumTax = (double)pedidos.Sum(p => (double)p.tax);
+            var sumTotal = (double)pedidos.Sum(p => (double)p.totalOrder);
+
+            //foreach (var o in orders)
+            //{
+            //    totalOrders = totalOrders + this.getTotalOrder(o.itens);
+            //    totalCost = totalCost + this.getCostOrder(o.itens);
+            //    totalTax = totalTax + this.getTaxOrder(o.itens);
+            //}
 
             dynamic retorno = new
             {
                 referencia = this.getReferenciaAtual(),
-                faturamentoGlobal = totalOrders,
-                margemGlobal = this.getMargin(totalOrders, totalTax, totalCost),
+                faturamentoGlobal = sumTotal,
+                margemGlobal = this.getMargin(sumTotal, sumTax, sumCost),
                 qtdePedidosGlobal = this.GetQuantidadePedidos()
         };
 
@@ -153,29 +160,27 @@ namespace pharma_mock_server.Controllers
 
         }
 
-        //[HttpPost("getMargemGlobal")]
-        //public double getMargemGlobal([FromBody] dynamic pedidoJson)
-        //{
+        [HttpPost("getMargemGlobal")]
+        public double getMargemGlobal([FromBody] dynamic pedidoJson)
+        {
 
-        //    //var editOrder = JsonConvert.DeserializeObject<dynamic>(pedidoJson);
+            //exclui o pedido em edição na simulação para adicioná-lo no cálculo depois....
+            var pedidos = this.Get().Where(p => (int)p.number != (int)pedidoJson.number);
 
-        //    //exclui o pedido em edição na simulação para adicioná-lo no cálculo depois....
-        //    var pedidos = this.Get().Where(p => (int) p.number != (int) pedidoJson.number);
+            var sumCost = (double)pedidos.Sum(p => (double)p.cost);
+            var sumTax = (double)pedidos.Sum(p => (double)p.tax);
+            var sumTotal = (double)pedidos.Sum(p => (double)p.totalOrder);
 
-        //    var sumCost = (double) pedidos.Sum(p => (double) p.cost);
-        //    var sumTax = (double) pedidos.Sum(p => (double) p.tax);
-        //    var sumTotal = (double) pedidos.Sum(p => (double) p.totalOrder);
+            // Adiciona os dados do pedido em edição
+            sumCost += this.getCostOrder(pedidoJson.itens);
+            sumTax += this.getTaxOrder(pedidoJson.itens);
+            sumTotal += this.getTotalOrder(pedidoJson.itens);
 
-        //    // Adiciona os dados do pedido em edição
-        //    sumCost += this.getCostOrder(pedidoJson.itens);
-        //    sumTax += this.getTaxOrder(pedidoJson.itens);
-        //    sumTotal += this.getTotalOrder(pedidoJson.itens);
+            // Calcula a margem global considerando os dados do pedido em edição (simulação)
+            var margin = this.getMargin(sumTotal, sumTax, sumCost);
 
-        //    // Calcula a margem global
-        //    var margin = this.getMargin(sumTotal, sumTax, sumCost);
-            
-        //    return margin;
-        //}
+            return margin;
+        }
 
         private IList<dynamic> GetItens(int pedido)
         {
