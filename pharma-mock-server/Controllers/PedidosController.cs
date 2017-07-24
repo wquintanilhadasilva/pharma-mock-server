@@ -16,11 +16,15 @@ namespace pharma_mock_server.Controllers
 
         private IList<dynamic> listaDePedidos = new List<dynamic>();
 
+        List<dynamic> listaDeProdutos = new List<dynamic>();
+
         private readonly object syncLock = new object();
 
         public PedidosController()
         {
             this.carregarPedidos();
+
+            this.carregaProdutos();
         }
 
         private void carregarPedidos()
@@ -52,7 +56,7 @@ namespace pharma_mock_server.Controllers
                         listaDePedidos.Add(o);
 
                     }
-                }
+                }                
             }
         }
 
@@ -98,6 +102,23 @@ namespace pharma_mock_server.Controllers
         public string getReferenciaAtual()
         {
             return String.Format("{0:MM/yyyy}", DateTime.Now);
+        }
+
+        // GET api/pedidos/getProdutos
+        [HttpGet("getProdutos/{filtro}")]
+        public List<dynamic> getProdutos(string filtro)
+        {
+            var retorno = new List<dynamic>();
+
+            foreach(var prod in this.listaDeProdutos)
+            {
+                if (Convert.ToString(prod.productName).ToLower().Contains(filtro.ToLower()))
+                {
+                    retorno.Add(prod);
+                }
+            }
+            //var r = this.listaDeProdutos.Where(p => Convert.ToString(p.productName).ToLower().Contains(filtro)).FirstOrDefault();
+            return retorno;            
         }
 
         // GET api/pedidos/getFaturamentoGlobal
@@ -187,30 +208,58 @@ namespace pharma_mock_server.Controllers
             var retorno = new List<dynamic>();
             for (var c = 1; c <= 20; c++)
             {
-                double qtde = pedido + c;
-                double sales = 10 * retorno.Count / 0.2;
-                double total = qtde * sales;
-                double unitcost = 5.00 / c;
-                double totalcost = unitcost * qtde;
-                double tx = 0.015 * total;
-                double margin = this.getMargin(total, tx, totalcost);
-
-                var item = new
-                {
-                    id = Convert.ToString(c),
-                    productName = $"Produto XPTO {c} - {pedido}",
-                    quantidade = qtde,
-                    salesPrice = sales,
-                    totalItem = total,
-                    productUnitCost = unitcost,
-                    totalCost = totalcost,
-                    tax = tx,
-                    margin = margin
-                };
+                var item = this.makeItem(c, pedido, retorno.Count);
                 retorno.Add(item);
+
+                //double qtde = pedido + c;
+                //double sales = 10 * retorno.Count / 0.2;
+                //double total = qtde * sales;
+                //double unitcost = 5.00 / c;
+                //double totalcost = unitcost * qtde;
+                //double tx = 0.015 * total;
+                //double margin = this.getMargin(total, tx, totalcost);
+
+                //var item = new
+                //{
+                //    id = Convert.ToString(c),
+                //    productName = $"Produto XPTO {c} - {pedido}",
+                //    quantidade = qtde,
+                //    salesPrice = sales,
+                //    totalItem = total,
+                //    productUnitCost = unitcost,
+                //    totalCost = totalcost,
+                //    tax = tx,
+                //    margin = margin
+                //};
+                //retorno.Add(item);
             }
 
             return retorno;
+        }
+
+        private dynamic makeItem(int c, int pedido, int count)
+        {
+            double qtde = pedido + c;
+            double sales = 10 * count / 0.2;
+            double total = qtde * sales;
+            double unitcost =  5.00 / c;
+            double totalcost = unitcost * qtde;
+            double tx = 0.015 * total;
+            double margin = this.getMargin(total, tx, totalcost);
+
+            var item = new
+            {
+                id = Convert.ToString(c),
+                productName = $"Produto XPTO {c} - {pedido}",
+                quantidade = qtde,
+                salesPrice = sales,
+                totalItem = total,
+                productUnitCost = unitcost,
+                totalCost = totalcost,
+                tax = tx,
+                margin = margin
+            };
+            return item;
         }
 
         private double GetMarginOrder(dynamic itens)
@@ -270,6 +319,23 @@ namespace pharma_mock_server.Controllers
         private double getMargin(double totalValue, double taxTotalValue, double costTotalValue)
         {
             return totalValue == 0 ? 0 : (totalValue - (taxTotalValue + costTotalValue)) / totalValue * 100;
+        }
+
+        private void carregaProdutos()
+        {
+            for (var i = 21; i <= 40; i++)
+            {
+                var random = new Random();
+                this.listaDeProdutos.Add(
+                    new
+                    {
+                        id = Convert.ToString(i),
+                        productName = $"Produto ADDED {i}",
+                        salesPrice = random.NextDouble() * i,
+                        productUnitCost = random.NextDouble() * i,
+                        tax = random.NextDouble() * i,
+                    });
+            }
         }
 
 
